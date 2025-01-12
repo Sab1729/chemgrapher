@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemistry Grapher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #c9aafb;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+        }
+        .dropdown-container, .form-group, .scrollable {
+            margin-bottom: 15px;
+        }
+        label {
+            font-size: 14px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #cde1eb;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .scrollable {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Chemistry Grapher</h1>
+
+        <div class="dropdown-container">
+            <label for="plot-type">Please select the type of plotting:</label>
+            <select id="plot-type">
+                <option value="">Select</option>
+                <option value="bestfit">Bestfit-line</option>
+                <option value="curve">Curve</option>
+            </select>
+        </div>
+
+        <div id="form-container" class="form-group" style="display: none;">
+            <label for="title">Graph Title:</label>
+            <input type="text" id="title">
+
+            <label for="x-label">X-axis Label:</label>
+            <input type="text" id="x-label">
+
+            <label for="y-label">Y-axis Label:</label>
+            <input type="text" id="y-label">
+
+            <label for="x-count">Number of X values:</label>
+            <input type="number" id="x-count">
+
+            <label for="x-start">Starting X value:</label>
+            <input type="number" id="x-start">
+
+            <label for="x-update">Update in X value:</label>
+            <input type="number" id="x-update">
+
+            <button id="generate-inputs">Submit</button>
+        </div>
+
+        <div id="input-fields" class="scrollable" style="display: none;"></div>
+
+        <canvas id="plot-canvas" style="max-width: 100%; margin-top: 20px;"></canvas>
+    </div>
+
+    <script>
+        const plotType = document.getElementById('plot-type');
+        const formContainer = document.getElementById('form-container');
+        const inputFields = document.getElementById('input-fields');
+        const plotCanvas = document.getElementById('plot-canvas');
+        const generateInputsBtn = document.getElementById('generate-inputs');
+
+        plotType.addEventListener('change', () => {
+            if (plotType.value === 'bestfit') {
+                formContainer.style.display = 'block';
+                inputFields.style.display = 'none';
+                plotCanvas.style.display = 'none';
+            } else if (plotType.value === 'curve') {
+                alert('Curve plotting is not implemented yet!');
+            } else {
+                formContainer.style.display = 'none';
+            }
+        });
+
+        generateInputsBtn.addEventListener('click', () => {
+            const xCount = parseInt(document.getElementById('x-count').value);
+            const xStart = parseFloat(document.getElementById('x-start').value);
+            const xUpdate = parseFloat(document.getElementById('x-update').value);
+
+            if (isNaN(xCount) || isNaN(xStart) || isNaN(xUpdate)) {
+                alert('Please enter valid numeric values for X parameters.');
+                return;
+            }
+
+            inputFields.innerHTML = '';
+            for (let i = 0; i < xCount; i++) {
+                const xValue = xStart + i * xUpdate;
+                const entryDiv = document.createElement('div');
+                entryDiv.innerHTML = `
+                    <label>x = ${xValue.toFixed(2)}</label>
+                    <input type="number" data-x="${xValue}">
+                `;
+                inputFields.appendChild(entryDiv);
+            }
+
+            const plotBtn = document.createElement('button');
+            plotBtn.textContent = 'Plot Best-Fit Line';
+            plotBtn.addEventListener('click', () => plotBestFitLine(xStart, xUpdate, xCount));
+            inputFields.appendChild(plotBtn);
+
+            inputFields.style.display = 'block';
+        });
+
+        function plotBestFitLine(xStart, xUpdate, xCount) {
+            const inputs = Array.from(inputFields.querySelectorAll('input[type="number"]'));
+            const yValues = inputs.map(input => parseFloat(input.value));
+
+            if (yValues.some(isNaN)) {
+                alert('Please enter valid numeric values for all Y inputs.');
+                return;
+            }
+
+            const xValues = Array.from({ length: xCount }, (_, i) => xStart + i * xUpdate);
+
+            // Calculate best-fit line
+            const n = xValues.length;
+            const sumX = xValues.reduce((a, b) => a + b, 0);
+            const sumY = yValues.reduce((a, b) => a + b, 0);
+            const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+            const sumX2 = xValues.reduce((sum, x) => sum + x ** 2, 0);
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX ** 2);
+            const intercept = (sumY - slope * sumX) / n;
+
+            const bestFitY = xValues.map(x => slope * x + intercept);
+
+            // Plot
+            new Chart(plotCanvas, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Data Points',
+                            data: xValues.map((x, i) => ({ x, y: yValues[i] })),
+                            backgroundColor: 'blue',
+                        },
+                        {
+                            label: 'Best-Fit Line',
+                            data: xValues.map(x => ({ x, y: slope * x + intercept })),
+                            type: 'line',
+                            borderColor: 'red',
+                            fill: false,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                        },
+                    },
+                },
+            });
+
+            plotCanvas.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
